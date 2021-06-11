@@ -1,0 +1,70 @@
+trigger:
+  branches:
+    include:
+    - refs/heads/master
+jobs:
+- job: Job_1
+  displayName: Agent job 1
+  pool:
+    vmImage: ubuntu-18.04
+  steps:
+  - checkout: self
+  - task: TerraformInstaller@0
+    displayName: Install Terraform 0.15.4
+    inputs:
+      terraformVersion: 0.15.4
+  - task: TerraformTaskV2@2
+    displayName: 'Terraform : init'
+    inputs:
+      workingDirectory: terraform-templates/deploy-vmss-from-image
+      commandOptions: -reconfigure -get=true  -upgrade=false
+      backendServiceArm: 
+      backendAzureRmResourceGroupName: lab-RG
+      backendAzureRmStorageAccountName: storageaccountterraform
+      backendAzureRmContainerName: terraform-state
+      backendAzureRmKey: terraform.tfstate
+  - task: TerraformTaskV2@2
+    displayName: 'Terraform : destroy vmss'
+    inputs:
+      command: destroy
+      workingDirectory: terraform-templates/deploy-vmss-from-image
+      commandOptions: -target=azurerm_virtual_machine_scale_set.website-vmss
+      environmentServiceNameAzureRM: 
+      backendServiceArm: 
+      backendAzureRmResourceGroupName: lab-RG
+      backendAzureRmStorageAccountName: storageaccountterraform
+      backendAzureRmContainerName: terraform-state
+      backendAzureRmKey: terraform.tfstate
+  - task: PackerBuild@1
+    displayName: Build immutable image
+    inputs:
+      ConnectedServiceName: 
+      managedImageName: vm-packer-image
+      location: eastus
+      storageAccountName: storageaccountterraform
+      azureResourceGroup: lab-RG
+      baseImage: Canonical:UbuntuServer:18.04-LTS:linux
+      packagePath: immutable-cicd-terraform/website-code
+      deployScriptPath: deploy.sh
+      imageUri: vm-image-name
+      imageId: vm-resource-id
+  - task: TerraformTaskV2@2
+    displayName: 'Terraform : plan'
+    inputs:
+      command: plan
+      workingDirectory: terraform-templates/deploy-vmss-from-image
+      commandOptions: -out vmss.tfplan
+      environmentServiceNameAzureRM: 
+      backendServiceArm: 
+      backendAzureRmResourceGroupName: lab-RG
+      backendAzureRmStorageAccountName: storageaccountterraform
+      backendAzureRmContainerName: terraform-state
+      backendAzureRmKey: terraform.tf
+  - task: TerraformTaskV2@2
+    displayName: 'Terraform : apply'
+    inputs:
+      command: apply
+      workingDirectory: terraform-templates/deploy-vmss-from-image
+      commandOptions: vmss.tfplan
+      environmentServiceNameAzureRM: 
+...
