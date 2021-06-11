@@ -1,0 +1,4 @@
+storage_account_name= ""
+container_name="terraform-state"
+sas_token=""
+key="terraform.tfstate"
